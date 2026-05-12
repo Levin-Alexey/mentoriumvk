@@ -2,6 +2,14 @@ name = "mentoriumvk"
 main = "index.js"
 compatibility_date = "2026-05-10"
 
+kv_namespaces = [
+	{ binding = "KV", id = "b54eaa31fead4c558d880df8556ee13d" }
+]
+
+d1_databases = [
+	{ binding = "DB", database_id = "6e88dbf6-de94-48fb-8e8b-c3f809e7f447", database_name = "mentoriumai" }
+]
+
 
 
 
