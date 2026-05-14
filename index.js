@@ -10,6 +10,14 @@ import {
 	PERSONAL_STUDY_AI_COMMAND,
 	handlePersonalStudyAiSelection,
 } from "./handlers/personalStudyAi.js";
+import {
+	PERSONAL_CONFIRM_PARTICIPATION_COMMAND,
+	handlePersonalConfirmParticipation,
+} from "./handlers/personalConfirmParticipation.js";
+import {
+	SPEAKER_INFO_COMMAND,
+	handleSpeakerInfo,
+} from "./handlers/speakerInfo.js";
 
 const START_BONUS_COINS = 100;
 const USER_SEGMENT_NEW = "new";
@@ -270,9 +278,12 @@ export default {
 
 		console.log("Incoming event:", JSON.stringify(body));
 
-		if (body?.type === "confirmation" && body?.group_id === 238551367) {
+		const groupId = env.VK_GROUP_ID ? Number(env.VK_GROUP_ID) : 238551367;
+		const confirmationString = env.VK_CONFIRMATION ?? "c4d75344";
+
+		if (body?.type === "confirmation" && body?.group_id === groupId) {
 			console.log("Responding with confirmation string");
-			return new Response("c4d75344", {
+			return new Response(confirmationString, {
 				headers: { "content-type": "text/plain; charset=UTF-8" },
 			});
 		}
@@ -338,6 +349,32 @@ export default {
 						payload,
 					}).catch((err) => {
 						console.error("personal study AI handler failed:", String(err));
+					})
+				);
+			}
+
+			if (payloadCommand === PERSONAL_CONFIRM_PARTICIPATION_COMMAND) {
+				ctx.waitUntil(
+					handlePersonalConfirmParticipation({
+						env,
+						userId: message?.from_id,
+						peerId: message?.peer_id,
+						payload,
+					}).catch((err) => {
+						console.error("personal confirm participation handler failed:", String(err));
+					})
+				);
+			}
+
+			if (payloadCommand === SPEAKER_INFO_COMMAND) {
+				ctx.waitUntil(
+					handleSpeakerInfo({
+						env,
+						userId: message?.from_id,
+						peerId: message?.peer_id,
+						payload,
+					}).catch((err) => {
+						console.error("speaker info handler failed:", String(err));
 					})
 				);
 			}

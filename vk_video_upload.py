@@ -1,9 +1,20 @@
 import requests
 import sys
 import json
+import os
+from pathlib import Path
 
-token = "vk1.a.6fGXRTxOfFjdZuefdGcu---TqccDgOu-ND10BOKZMmmH7G-LR6LCrzTADJKI1TVm4GdiK5ds5j9WIiEl6WWc1mBFRI3Hi8rEkHUvRwVG64SSZoYDQ1BC-MRBvX4vPqI20o0jcUzGVtaks0NIFYL2xKo-sJqpC6lfkYp-zcxtkdJJ12IbNKvmunIZu1rL9VIi"
-group_id = 238551367
+# Load .env from project root
+_env_path = Path(__file__).parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip())
+
+token = os.environ["VK_USER_TOKEN"]
+group_id = int(os.environ["VK_GROUP_ID"])
 video_path = "/home/levin/Загрузки/personal.mp4"
 
 # 1. video.save

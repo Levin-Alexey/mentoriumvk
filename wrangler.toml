@@ -10,6 +10,11 @@ d1_databases = [
 	{ binding = "DB", database_id = "6e88dbf6-de94-48fb-8e8b-c3f809e7f447", database_name = "mentoriumai" }
 ]
 
+# Non-secret vars (public config)
+[vars]
+VK_GROUP_ID = "238551367"
 
-
-
+# Secret vars (SK, secret, VK_CONFIRMATION) — set via:
+#   proxychains4 wrangler secret put SK
+#   proxychains4 wrangler secret put secret
+#   proxychains4 wrangler secret put VK_CONFIRMATION
