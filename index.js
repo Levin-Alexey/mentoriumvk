@@ -6,8 +6,18 @@ import {
 	BUSINESS_SCALING_COMMAND,
 	handleBusinessScalingSelection,
 } from "./handlers/businessScaling.js";
+import {
+	PERSONAL_STUDY_AI_COMMAND,
+	handlePersonalStudyAiSelection,
+} from "./handlers/personalStudyAi.js";
 
 const START_BONUS_COINS = 100;
+const USER_SEGMENT_NEW = "new";
+const USER_SEGMENT_REGISTERED_WEBINAR = "registered_webinar";
+
+const REGISTERED_WEBINAR_INFO_COMMAND = "registered_webinar_info";
+const REGISTERED_WEBINAR_GIFT_COMMAND = "registered_webinar_gift";
+const REGISTERED_WEBINAR_SUPPORT_COMMAND = "registered_webinar_support";
 
 const DEFAULT_START_TEXT = `👋 Приветствую!
 Добро пожаловать! 
@@ -25,6 +35,20 @@ const DEFAULT_START_TEXT = `👋 Приветствую!
 🎁 Подарок (База нейросетей) будет оправлен после вебинара
 
 Для каких целей хотите освоить ИИ?`;
+
+const DEFAULT_REGISTERED_START_TEXT = `👋 Рады видеть вас снова!
+
+Вы уже записаны на вебинар, супер.
+Ниже быстрые кнопки, чтобы подготовиться к эфиру и не пропустить важное.`;
+
+const REGISTERED_MENU_RESPONSES = {
+	[REGISTERED_WEBINAR_INFO_COMMAND]:
+		"📍 Вебинар пройдет онлайн. Ссылку и напоминание отправим в этот чат заранее.",
+	[REGISTERED_WEBINAR_GIFT_COMMAND]:
+		"🎁 Подарок (база нейросетей) отправим после вебинара. Если хотите, могу напомнить, как его получить.",
+	[REGISTERED_WEBINAR_SUPPORT_COMMAND]:
+		"💬 Если нужна помощь, напишите ваш вопрос в ответ на это сообщение, и куратор подключится.",
+};
 
 function buildStartKeyboard() {
 	return JSON.stringify({
@@ -51,6 +75,103 @@ function buildStartKeyboard() {
 				},
 			],
 		],
+	});
+}
+
+function buildRegisteredStartKeyboard() {
+	return JSON.stringify({
+		inline: true,
+		buttons: [
+			[
+				{
+					action: {
+						type: "text",
+						label: "📍 Где вебинар",
+						payload: JSON.stringify({ command: REGISTERED_WEBINAR_INFO_COMMAND }),
+					},
+					color: "primary",
+				},
+			],
+			[
+				{
+					action: {
+						type: "text",
+						label: "🎁 Как получить подарок",
+						payload: JSON.stringify({ command: REGISTERED_WEBINAR_GIFT_COMMAND }),
+					},
+					color: "positive",
+				},
+			],
+			[
+				{
+					action: {
+						type: "text",
+						label: "💬 Связь с куратором",
+						payload: JSON.stringify({ command: REGISTERED_WEBINAR_SUPPORT_COMMAND }),
+					},
+					color: "secondary",
+				},
+			],
+		],
+	});
+}
+async function getUserSegmentByVkId(env, vkId) {
+	if (!env.DB) {
+		return USER_SEGMENT_NEW;
+	}
+
+	const userRow = await env.DB.prepare("SELECT id FROM users WHERE vk_id = ? LIMIT 1")
+		.bind(vkId)
+		.first();
+
+	if (!userRow) {
+		return USER_SEGMENT_NEW;
+	}
+
+	const registrationRow = await env.DB.prepare(
+		"SELECT 1 FROM webinar_registrations WHERE user_id = ? LIMIT 1"
+	)
+		.bind(Number(userRow.id))
+		.first();
+
+	return registrationRow ? USER_SEGMENT_REGISTERED_WEBINAR : USER_SEGMENT_NEW;
+}
+
+function getStartScenario(env, segment) {
+	if (segment === USER_SEGMENT_REGISTERED_WEBINAR) {
+		return {
+			text: env.REGISTERED_START_TEXT ?? DEFAULT_REGISTERED_START_TEXT,
+			attachment:
+				env.REGISTERED_START_IMAGE_ATTACHMENT ??
+				env.REGISTERED_START_ATTACHMENT ??
+				"",
+			keyboard: buildRegisteredStartKeyboard(),
+		};
+	}
+
+	return {
+		text: env.START_TEXT ?? DEFAULT_START_TEXT,
+		attachment: env.START_VIDEO_ATTACHMENT ?? env.START_ATTACHMENT ?? "",
+		keyboard: buildStartKeyboard(),
+	};
+}
+
+async function sendRegisteredMenuResponse({ env, peerId, command }) {
+	const token = env.SK;
+	if (!token) {
+		console.error("SK token is not configured");
+		return;
+	}
+
+	const responseText = REGISTERED_MENU_RESPONSES[command];
+	if (!responseText) {
+		return;
+	}
+
+	await sendVkMessage(token, {
+		peer_id: String(peerId),
+		message: responseText,
+		random_id: String(Date.now() % 2147483647),
 	});
 }
 
@@ -111,6 +232,24 @@ async function upsertUserAndApplyStartBonus(env, message) {
 		.bind(userName, Number(existingUser.id))
 		.run();
 	console.log("VK user already exists, start bonus skipped:", vkId);
+}
+
+async function sendVkMessage(token, params) {
+	const body = new URLSearchParams({
+		...params,
+		access_token: token,
+		v: "5.199",
+	});
+
+	const resp = await fetch("https://api.vk.com/method/messages.send", {
+		method: "POST",
+		headers: { "content-type": "application/x-www-form-urlencoded" },
+		body: body.toString(),
+	});
+
+	const resultText = await resp.text();
+	console.log("messages.send result:", resultText);
+	return resultText;
 }
 
 export default {
@@ -190,6 +329,35 @@ export default {
 				);
 			}
 
+			if (payloadCommand === PERSONAL_STUDY_AI_COMMAND) {
+				ctx.waitUntil(
+					handlePersonalStudyAiSelection({
+						env,
+						userId: message?.from_id,
+						peerId: message?.peer_id,
+						payload,
+					}).catch((err) => {
+						console.error("personal study AI handler failed:", String(err));
+					})
+				);
+			}
+
+			if (
+				payloadCommand === REGISTERED_WEBINAR_INFO_COMMAND ||
+				payloadCommand === REGISTERED_WEBINAR_GIFT_COMMAND ||
+				payloadCommand === REGISTERED_WEBINAR_SUPPORT_COMMAND
+			) {
+				ctx.waitUntil(
+					sendRegisteredMenuResponse({
+						env,
+						peerId: message?.peer_id,
+						command: payloadCommand,
+					}).catch((err) => {
+						console.error("registered menu response failed:", String(err));
+					})
+				);
+			}
+
 			if (isStart) {
 				const token = env.SK;
 				if (!token) {
@@ -200,36 +368,37 @@ export default {
 				}
 
 				const peerId = message?.peer_id;
-				const startText = env.START_TEXT ?? DEFAULT_START_TEXT;
-				const attachment = env.START_ATTACHMENT ?? "";
-				const randomId = Math.floor(Date.now() % 2147483647);
-				const keyboard = buildStartKeyboard();
+				const randomIdBase = Date.now();
+				const vkId = Number(message?.from_id);
 
 				ctx.waitUntil(
 					(async () => {
-						await upsertUserAndApplyStartBonus(env, message);
+						const segment = Number.isFinite(vkId)
+							? await getUserSegmentByVkId(env, vkId)
+							: USER_SEGMENT_NEW;
 
-						const params = new URLSearchParams({
-							peer_id: String(peerId),
-							message: startText,
-							random_id: String(randomId),
-							keyboard,
-							access_token: token,
-							v: "5.199",
-						});
-
-						if (attachment) {
-							params.set("attachment", attachment);
+						if (segment === USER_SEGMENT_NEW) {
+							await upsertUserAndApplyStartBonus(env, message);
+						} else {
+							console.log("Registered webinar user: skip start bonus", vkId);
 						}
 
-						const resp = await fetch("https://api.vk.com/method/messages.send", {
-							method: "POST",
-							headers: { "content-type": "application/x-www-form-urlencoded" },
-							body: params.toString(),
-						});
+						const scenario = getStartScenario(env, segment);
 
-						const result = await resp.text();
-						console.log("messages.send result:", result);
+						if (scenario.attachment) {
+							await sendVkMessage(token, {
+								peer_id: String(peerId),
+								attachment: scenario.attachment,
+								random_id: String(randomIdBase % 2147483647),
+							});
+						}
+
+						await sendVkMessage(token, {
+							peer_id: String(peerId),
+							message: scenario.text,
+							keyboard: scenario.keyboard,
+							random_id: String((randomIdBase + 1) % 2147483647),
+						});
 					})().catch((err) => {
 						console.error("messages.send failed:", String(err));
 					})

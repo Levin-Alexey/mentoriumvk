@@ -1,0 +1,1 @@
+{"error":{"error_code":27,"error_msg":"Group authorization failed: method is unavailable with group auth.","request_params":[{"key":"wallpost","value":"0"},{"key":"is_private","value":"0"},{"key":"v","value":"5.199"},{"key":"method","value":"video.save"},{"key":"oauth","value":"1"}]}}

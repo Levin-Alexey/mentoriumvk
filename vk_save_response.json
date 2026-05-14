@@ -1,0 +1,1 @@
+{"error":{"error_code":15,"error_subcode":1133,"error_msg":"Access denied: no access to call this method. It cannot be called with current scopes.","request_params":[{"key":"group_id","value":"238551367"},{"key":"wallpost","value":"0"},{"key":"is_private","value":"0"},{"key":"v","value":"5.199"},{"key":"method","value":"video.save"},{"key":"oauth","value":"1"}]}}
